@@ -104,6 +104,18 @@ namespace CharacterEditor
 		}
 #endif
 
+	    public static string CurrentDirectory
+	    {
+	        get
+	        {
+                return Directory.GetCurrentDirectory();
+	        }
+            set
+            {
+                Directory.SetCurrentDirectory(value);
+            }
+	    }
+
 		public static List<string> GetResourceSets()
 		{
 #if SILVERLIGHT

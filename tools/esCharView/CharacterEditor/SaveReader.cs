@@ -6,7 +6,7 @@ using System.IO;
 
 namespace CharacterEditor
 {
-	public class SaveReader
+	public class SaveReader : ICloneable
 	{
 		/// <summary>
 		/// Character's inventory
@@ -119,25 +119,31 @@ namespace CharacterEditor
 			ReadHeaders(rawCharacterData);
 		}
 
+        public byte[] GetBytes(bool skipFailedData = false)
+        {
+            byte[] characterBytes = (skipFailedData && FailedCharacterDecoding) ? OriginalCharacterBytes : Character.GetCharacterBytes();
+            byte[] statsBytes = Stat.GetStatBytes();
+            byte[] skillBytes = (skipFailedData && FailedSkillDecoding) ? OriginalSkillBytes : Skill.GetSkillBytes();
+            byte[] inventoryBytes = (skipFailedData && FailedInventoryDecoding) ? OriginalInventoryBytes : Inventory.GetInventoryBytes(Character.HasMercenary);
+            byte[] rawCharacterData = new byte[characterBytes.Length + statsBytes.Length + skillBytes.Length + inventoryBytes.Length];
+
+            Array.Copy(characterBytes, rawCharacterData, characterBytes.Length);
+            Array.Copy(statsBytes, 0, rawCharacterData, characterBytes.Length, statsBytes.Length);
+            Array.Copy(skillBytes, 0, rawCharacterData, characterBytes.Length + statsBytes.Length, skillBytes.Length);
+            Array.Copy(inventoryBytes, 0, rawCharacterData, characterBytes.Length + statsBytes.Length + skillBytes.Length, inventoryBytes.Length);
+
+            FixHeaders(ref rawCharacterData);
+
+            return rawCharacterData;
+        }
 
 		/// <summary>
 		/// Saves player data to specified path
 		/// </summary>
 		/// <param name="filePath">Path to save character data as</param>
-		public void Write(Stream saveFile, bool skipFailedData)
+		public void Write(Stream saveFile, bool skipFailedData = false)
 		{
-			byte[] characterBytes = (skipFailedData && FailedCharacterDecoding) ? OriginalCharacterBytes : Character.GetCharacterBytes();
-			byte[] statsBytes = Stat.GetStatBytes();
-			byte[] skillBytes = (skipFailedData && FailedSkillDecoding) ? OriginalSkillBytes : Skill.GetSkillBytes();
-			byte[] inventoryBytes = (skipFailedData && FailedInventoryDecoding) ? OriginalInventoryBytes : Inventory.GetInventoryBytes(Character.HasMercenary);
-			byte[] rawCharacterData = new byte[characterBytes.Length + statsBytes.Length + skillBytes.Length + inventoryBytes.Length];
-
-			Array.Copy(characterBytes, rawCharacterData, characterBytes.Length);
-			Array.Copy(statsBytes, 0, rawCharacterData, characterBytes.Length, statsBytes.Length);
-			Array.Copy(skillBytes, 0, rawCharacterData, characterBytes.Length + statsBytes.Length, skillBytes.Length);
-			Array.Copy(inventoryBytes, 0, rawCharacterData, characterBytes.Length + statsBytes.Length + skillBytes.Length, inventoryBytes.Length);
-
-			FixHeaders(ref rawCharacterData);
+		    var rawCharacterData = GetBytes();
 
 			using (BinaryWriter bw = new BinaryWriter(saveFile))
 			{
@@ -381,5 +387,10 @@ namespace CharacterEditor
 			Stat.SkillPoints = totalSkillPoints;
 			Stat.StatPoints = totalStatPoints;
 		}
+
+        public object Clone()
+        {
+            return this.MemberwiseClone();
+        }
 	}
 }

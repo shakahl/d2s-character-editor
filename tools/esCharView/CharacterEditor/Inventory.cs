@@ -380,11 +380,6 @@ namespace CharacterEditor
 			foreach (Item item in items)
 			{
 				inventoryBytes.AddRange(item.GetItemBytes());
-
-				foreach (Item itemSocket in item.Sockets)
-				{
-					inventoryBytes.AddRange(itemSocket.GetItemBytes());
-				}
 			}
 		}
 

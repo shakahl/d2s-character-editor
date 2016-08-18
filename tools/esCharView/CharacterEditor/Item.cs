@@ -7,7 +7,7 @@ using BKSystem.IO;
 
 namespace CharacterEditor
 {
-	public class Item : INotifyPropertyChanged
+	public class Item : INotifyPropertyChanged, ICloneable
 	{
 		public enum ItemQuality
 		{
@@ -259,29 +259,38 @@ namespace CharacterEditor
 			get { return GetDataBoolean("IsRuneword"); }
 			set { SetData("IsRuneword", value); }
 		}
-		public ItemLocation Location
+        /// <summary>
+        /// ItemLocation enum
+        /// </summary>
+		public uint Location
 		{
-			get { return (ItemLocation)GetDataValue("Location"); }
+			get { return GetDataValue("Location"); }
 			set { SetData("Location", value); }
 		}
-		public EquipmentLocation PositionOnBody
+        /// <summary>
+        /// EquipmentLocation enum
+        /// </summary>
+        public uint PositionOnBody
 		{
-			get { return (EquipmentLocation)GetDataValue("PositionOnBody"); }
+			get { return GetDataValue("PositionOnBody"); }
 			set { SetData("PositionOnBody", value); }
 		}
 		public uint PositionX
 		{
 			get { return GetDataValue("PositionX"); }
-			set { SetData("PositionOnBody", value); }
+            set { SetData("PositionX", value); }
 		}
 		public uint PositionY
 		{
 			get { return GetDataValue("PositionY"); }
-			set { SetData("PositionOnBody", value); }
+            set { SetData("PositionY", value); }
 		}
-		public StorageType StorageId
+        /// <summary>
+        /// StorageType enum
+        /// </summary>
+        public uint StorageId
 		{
-			get { return (StorageType)GetDataValue("StorageId"); }
+			get { return GetDataValue("StorageId"); }
 			set { SetData("StorageId", value); }
 		}
 		#endregion
@@ -346,9 +355,12 @@ namespace CharacterEditor
 				SetData("Level", value);
 			}
 		}
-		public ItemQuality Quality
+        /// <summary>
+        /// ItemQuality enum
+        /// </summary>
+        public uint Quality
 		{
-			get { return (ItemQuality)GetDataValue("Quality"); }
+            get { return GetDataValue("Quality"); }
 			set { SetData("Quality", value); }
 		}
 		public bool HasGraphic
@@ -559,7 +571,12 @@ namespace CharacterEditor
 			CreateDataIndicies();
 		}
 
-		public Item(byte[] itemData)
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="itemData"></param>
+        /// <param name="forceReadSockets">must be true only if new Item is created from byte[] array</param>
+		public Item(byte[] itemData, bool forceReadSockets)
 		{
 			if (itemData[0] != 'J' || itemData[1] != 'M')
 			{
@@ -570,7 +587,11 @@ namespace CharacterEditor
 
 			ReadItemData();
 			ReadRemainingBits();
+
+            if (forceReadSockets)
+                ReadSockets(itemData);
 		}
+
 
 		/// <summary>
 		/// Decodes raw item data
@@ -716,7 +737,7 @@ namespace CharacterEditor
 				ReadData("ClassInfo", 11);
 			}
 
-			switch (Quality)
+            switch ((ItemQuality)Quality)
 			{
 				case ItemQuality.Inferior:
 					ReadData("InferiorQualityType", 3);
@@ -826,14 +847,14 @@ namespace CharacterEditor
 				ReadData("SocketCount", 4);
 			}
 
-			if (Quality == ItemQuality.Set)
+            if ((ItemQuality)Quality == ItemQuality.Set)
 			{
 				ReadData("NumberOfSetProperties", 5);
 			}
 
 			ReadPropertyList(properties);
 
-			if (Quality == ItemQuality.Set)
+            if ((ItemQuality)Quality == ItemQuality.Set)
 			{
 				int numberOfSetProperties = (int)GetDataValue("NumberOfSetProperties");
 
@@ -876,7 +897,13 @@ namespace CharacterEditor
 		/// <param name="isAdditional">Property to read has no header. Found in damage type properties</param>
 		private void ReadPropertyData(List<PropertyInfo> propertyList, int currentPropertyID, bool isAdditional = false)
 		{
-			ItemStatCost statCost = ItemDefs.ItemStatCostsById[currentPropertyID];
+		    //ItemStatCost statCost = null;
+		    //if (ItemDefs.ItemStatCostsById.ContainsKey(currentPropertyID))
+			    ItemStatCost statCost = ItemDefs.ItemStatCostsById[currentPropertyID];
+
+            if (statCost == null)
+                return;
+
 			PropertyInfo currentPropertyInfo = new PropertyInfo();
 
 			currentPropertyInfo.IsAdditionalProperty = isAdditional;
@@ -938,7 +965,7 @@ namespace CharacterEditor
 			Item socketedItem = Sockets[index];
 			socketedItem.IsNotInSocket = true;
 			socketedItem.IsInSocket = false;
-			socketedItem.Location = Item.ItemLocation.Stored;
+			socketedItem.Location = (uint)Item.ItemLocation.Stored;
 
 			Sockets.RemoveAt(index);
 			SocketsFilled--;
@@ -975,6 +1002,55 @@ namespace CharacterEditor
 				ReadData("LAST", (int)(bs.RemainingBits) - paddingBitCount);
 			}
 		}
+
+
+        // ADDED by HarpyWar
+        private void ReadSockets(byte[] itemBytes)
+        {
+            if (IsSocketed)
+            {
+                // set begin position (this is without sockets, so start to read sockets from here)
+                var begin = GetItemBytes().Length;
+
+                uint failedSockets = 0;
+
+                for (int i = 0; i < SocketsFilled; i++)
+                {
+                    Item nextItem = GetNextSocket(itemBytes, ref begin);
+
+                    if (nextItem == null)
+                    {
+                        failedSockets++;
+                        continue;
+                    }
+
+                    Sockets.Add(nextItem);
+                }
+            }
+        }
+        private Item GetNextSocket(byte[] itemBytes, ref int begin)
+        {
+            int itemDataSize = GetNextSocketSize(itemBytes, begin);
+            byte[] itemData = new byte[itemDataSize];
+            Array.Copy(itemBytes, begin, itemData, 0, itemDataSize);
+
+            return new Item(itemData);
+        }
+        private int GetNextSocketSize(byte[] itemBytes, int begin)
+        {
+            for (int i = begin + 2; i < itemBytes.Length - 1; i++)
+            {
+                // Header of next item record or end of inventory list reached
+                if (itemBytes[i] == 'J' && itemBytes[i + 1] == 'M')
+                {
+                    return i - begin;
+                }
+            }
+
+            return itemBytes.Length - begin;
+        }
+
+
 
 		/// <summary>
 		/// Reads a value (up to 32 bits) from the BitReader
@@ -1271,8 +1347,24 @@ namespace CharacterEditor
 				}
 			}
 
-			return bs.ToReversedByteArray();
+			var itemBytes = bs.ToReversedByteArray();
+            return addSocketsBytes(itemBytes);
 		}
+
+        /// <summary>
+        /// Merge item bytes and sockets bytes
+        /// </summary>
+        /// <param name="itemBytes"></param>
+        private byte[] addSocketsBytes(byte[] itemBytes)
+        {
+            var bytes = new List<byte>();
+            bytes.AddRange(itemBytes);
+
+            foreach (var socket in Sockets)
+                bytes.AddRange(socket.GetItemBytes());
+
+            return bytes.ToArray();
+        }
 
 		/// <summary>
 		/// Writes an item property to the BitStream
@@ -1416,11 +1508,11 @@ namespace CharacterEditor
 		{
 			StringBuilder sb = new StringBuilder();
 
-			sb.Append(String.Format("{0} {1}", ItemCode, ItemDefs.GetItemDescription(ItemCode)));
+			sb.Append(String.Format("{0}", ItemDefs.GetItemDescription(ItemCode)));
 
 			if (sockets.Count > 0)
 			{
-				sb.Append(" { ");
+				sb.Append(" (");
 				for (int i = 0; i < sockets.Count; i++)
 				{
 					sb.Append(ItemDefs.GetItemDescription(sockets[i].ItemCode));
@@ -1430,7 +1522,7 @@ namespace CharacterEditor
 						sb.Append(", ");
 					}
 				}
-				sb.Append(" }");
+				sb.Append(")");
 			}
 
 			return sb.ToString();
@@ -1449,5 +1541,10 @@ namespace CharacterEditor
 		}
 
 		#endregion
+
+        public object Clone()
+        {
+            return this.MemberwiseClone();
+        }
 	}
 }
