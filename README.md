@@ -1,4 +1,4 @@
-I pay attention to a project `d2es-stuff/tools/esCharView/CharacterEditor` in the repository forked from [nooperation/d2es-stuff](https://github.com/nooperation/d2es-stuff). 
+I pay attention to a project `tools/esCharView/CharacterEditor` in the repository forked from [nooperation/d2es-stuff](https://github.com/nooperation/d2es-stuff). 
 
 **CharacterEditor** is .NET library for editing Diablo 2 character files (`.d2s`).
 
